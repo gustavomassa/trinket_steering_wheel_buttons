@@ -2,7 +2,7 @@
 #include "SendOnlySoftwareSerial.h"
 
 const int ledPin = 1; // built in red LED
-SendOnlySoftwareSerial hc05Slave (0);  // Tx pin
+SendOnlySoftwareSerial ftdiTx (1);  // Tx pin
 
 void blink()
 {
@@ -20,7 +20,7 @@ void setup()
 {
   pinMode(ledPin, OUTPUT);
 
-  hc05Slave.begin(9600);
+  ftdiTx.begin(9600);
 
   blink();
 }
@@ -29,6 +29,8 @@ void setup()
 void loop()
 {
   blink();
-  hc05Slave.println("tocson");
+
+  ftdiTx.println("blink");
+
   delay(100);
 }
