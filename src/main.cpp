@@ -3,9 +3,9 @@
 #include <ProTrinketGamepad.h>
 #include <stdio.h>
 
-#define LED_PIN 1      // built in red LED
+#define LED_PIN 1 // built in red LED
 #define RESPONSE_DELAY_MS 5
-#define BUTTON_DEBOUNCE_MS 20
+#define BUTTON_DEBOUNCE_MS 30
 
 SendOnlySoftwareSerial serialTx(1); // Tx pin
 
@@ -13,45 +13,82 @@ struct Button
 {
   uint8_t index;
   uint8_t pin;
-  uint8_t lastState = HIGH;     // last button reading
+  uint8_t lastState; // last button reading
+  boolean pullup = true;
   boolean pressed = false;
   boolean changed = false;
   unsigned long debounceMs = 0; // last time the button was toggled
 
-  Button(uint8_t index, uint8_t pin) : index(index), pin(pin) {}
+  Button(uint8_t index, uint8_t pin, boolean pullup = true) : index(index), pin(pin), pullup(pullup) {}
   void init()
   {
-    pinMode(pin, INPUT_PULLUP);
+    if (pullup)
+    {
+      pinMode(pin, INPUT_PULLUP);
+      lastState = HIGH;
+    }
+    else
+    {
+      pinMode(pin, INPUT);
+      lastState = LOW;
+    }
+  }
+  boolean isPressed(const uint8_t state)
+  {
+    if (pullup)
+    {
+      return (lastState == HIGH && state == LOW);
+    }
+    else
+    {
+      return (lastState == LOW && state == HIGH);
+    }
+
+    return false;
+  }
+  boolean isReleased(const uint8_t state)
+  {
+    if (pullup)
+    {
+      return (lastState == LOW && state == HIGH);
+    }
+    else
+    {
+      return (lastState == HIGH && state == LOW);
+    }
+
+    return false;
   }
   uint8_t read()
   {
-    changed = false;
+    // check debounce before changing state
+    if ((millis() - debounceMs) < BUTTON_DEBOUNCE_MS)
+    {
+      return lastState;
+    }
 
-// get current state
+    // reset debounce timer
+    debounceMs = millis();
+
+    // get current state
+    changed = false;
     const uint8_t state = digitalRead(pin);
-    
+
     // check if changed state
     if (state != lastState)
     {
       changed = true;
 
-      if (lastState == HIGH && state == LOW)
+      if (isPressed(state))
       {
         pressed = true;
-
-        // only apply debounce for pressed state
-/*         if ((millis() - debounceMs) > BUTTON_DEBOUNCE_MS)
-        {
-        } */
       }
-      else if (lastState == LOW && state == HIGH)
+      else if (isReleased(state))
       {
         pressed = false;
-
-        // reset debounce timer
-        debounceMs = millis();
       }
 
+      // update last state
       lastState = state;
     }
 
@@ -65,8 +102,8 @@ Button buttons[] = {
     Button(1, 4),
     Button(2, 5),
     Button(3, 6),
-    //Button(4, 8),
-    //Button(5, 9),
+    // Button(4, 8),
+    // Button(5, 9),
 };
 
 void blink()
@@ -74,6 +111,12 @@ void blink()
   digitalWrite(LED_PIN, HIGH);
   delay(1000);
   digitalWrite(LED_PIN, LOW);
+}
+
+void enableSerialDebug()
+{
+  serialTx.begin(9600);
+  serialTx.println("Started");
 }
 
 void serialDebugButton(Button b)
@@ -99,8 +142,7 @@ void setup()
 
   TrinketGamepad.begin();
 
-  serialTx.begin(9600);
-  serialTx.println("Started");
+  // enableSerialDebug();
 }
 
 // the loop routine runs over and over again forever:
@@ -113,7 +155,7 @@ void loop()
     uint8_t bState = buttons[i].read();
     bitWrite(buttonMap, i, !bState);
 
-    serialDebugButton(buttons[i]);
+    // serialDebugButton(buttons[i]);
   }
 
   TrinketGamepad.move(0, 0, 0, 0, buttonMap);
