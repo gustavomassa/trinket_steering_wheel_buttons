@@ -1,107 +1,22 @@
 #include <Arduino.h>
-#include "SendOnlySoftwareSerial.h"
-#include <ProTrinketGamepad.h>
 #include <stdio.h>
+
+#include "SendOnlySoftwareSerial.h"
+#include "ProTrinketGamepad.h"
+#include "button.h"
 
 #define LED_PIN 1 // built in red LED
 #define RESPONSE_DELAY_MS 5
-#define BUTTON_DEBOUNCE_MS 30
 
 SendOnlySoftwareSerial serialTx(1); // Tx pin
 
-struct Button
-{
-  uint8_t index;
-  uint8_t pin;
-  uint8_t lastState; // last button reading
-  boolean pullup = true;
-  boolean pressed = false;
-  boolean changed = false;
-  unsigned long debounceMs = 0; // last time the button was toggled
-
-  Button(uint8_t index, uint8_t pin, boolean pullup = true) : index(index), pin(pin), pullup(pullup) {}
-  void init()
-  {
-    if (pullup)
-    {
-      pinMode(pin, INPUT_PULLUP);
-      lastState = HIGH;
-    }
-    else
-    {
-      pinMode(pin, INPUT);
-      lastState = LOW;
-    }
-  }
-  boolean isPressed(const uint8_t state)
-  {
-    if (pullup)
-    {
-      return (lastState == HIGH && state == LOW);
-    }
-    else
-    {
-      return (lastState == LOW && state == HIGH);
-    }
-
-    return false;
-  }
-  boolean isReleased(const uint8_t state)
-  {
-    if (pullup)
-    {
-      return (lastState == LOW && state == HIGH);
-    }
-    else
-    {
-      return (lastState == HIGH && state == LOW);
-    }
-
-    return false;
-  }
-  uint8_t read()
-  {
-    // check debounce before changing state
-    if ((millis() - debounceMs) < BUTTON_DEBOUNCE_MS)
-    {
-      return lastState;
-    }
-
-    // reset debounce timer
-    debounceMs = millis();
-
-    // get current state
-    changed = false;
-    const uint8_t state = digitalRead(pin);
-
-    // check if changed state
-    if (state != lastState)
-    {
-      changed = true;
-
-      if (isPressed(state))
-      {
-        pressed = true;
-      }
-      else if (isReleased(state))
-      {
-        pressed = false;
-      }
-
-      // update last state
-      lastState = state;
-    }
-
-    return lastState;
-  }
-};
 
 uint16_t buttonMap;
 Button buttons[] = {
-    Button(0, 3),
-    Button(1, 4),
-    Button(2, 5),
-    Button(3, 6),
+    Button(3),
+    Button(4),
+    Button(5),
+    Button(6),
     // Button(4, 8),
     // Button(5, 9),
 };
@@ -119,26 +34,10 @@ void enableSerialDebug()
   serialTx.println("Started");
 }
 
-void serialDebugButton(Button b)
-{
-  if (b.changed)
-  {
-    int length = snprintf(NULL, 0, "b(%d): %d, pressed: %d", b.index, b.lastState, b.pressed);
-    char buffer[length + 1];
-    snprintf(buffer, length + 1, "b(%d): %d, pressed: %d", b.index, b.lastState, b.pressed);
-    serialTx.println(buffer);
-  }
-}
-
 // the setup routine runs once when you press reset:
 void setup()
 {
   pinMode(LED_PIN, OUTPUT);
-
-  for (uint8_t i = 0; i < sizeof(buttons); i++)
-  {
-    buttons[i].init();
-  }
 
   TrinketGamepad.begin();
 
